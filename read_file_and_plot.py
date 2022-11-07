@@ -1,7 +1,7 @@
 #command line interface intput:
 #python3 read_file_and_plot.py Simulation_time, simulation_time_unit, time_step(eg:ps/ns/fs), simulation_output_file_path, output_filename(eg:test_out1) 
 
-#to test this module: python read_file_and_plot.py 4 'ps' 'fs' ./dist-end-to-end.agr 'test_example1'
+#to test this module: python read_file_and_plot.py 4 'ps' 'fs' ./data1/dist-end-to-end.agr 'test_example1'
 
 
 
