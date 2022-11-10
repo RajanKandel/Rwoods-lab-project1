@@ -1,7 +1,7 @@
 #command line interface intput:
 #python3 read_file_and_plot.py Simulation_time, simulation_time_unit, time_step(eg:ps/ns/fs), simulation_output_file_path, output_filename(eg:test_out1) 
 
-#to test this module: python read_file_and_plot.py 4 'ps' 'fs' ./data1/dist-end-to-end.agr 'test_example1'
+#to test this module: python read_file_and_plot.py 4 'fs' 'ps' ./data1/dist-end-to-end.agr 'test_example1'
 
 
 
@@ -48,23 +48,38 @@ class read_file_and_plot:
         #get the required time step dataframe
         num_Tstep = df_file1['step'][-1:]
         
-        #assuming that time frame for data available was is in ps
-        if self.tsim_unit == 'ps':
+        #converting simulation frame into time step:
+        df_file1['time_step' + '(' + self.tsim_unit + ')'] = df_file1.apply(lambda row: row.step * self.tsim, axis = 1)
+        df_file1['time_step' + '(' + self.tsim_unit + ')'].astype(int)
+        
+        
+        self. find_multiplier(df_file1)
+        
+    #convert between units:                          
+    def find_multiplier(self, df_file1):          
+        ls_unit = ['fs', 'ps', 'ns', 'ms']
+        if ls_unit.index(self.tstep) > ls_unit.index(self.tsim_unit):
+            multiplier = 10 **(-3 * ls_unit.index(self.tstep))
             
-            if self.tstep == 'ns': #going to higher unit doesnot make sense eg: ps -> ns
-                df_file1['time_step(ns)'] = df_file1.apply(lambda row: row.step * 0.001, axis = 1)
-
-            if self.tstep == 'ps':
-                df_file1['time_step(ps)'] = df_file1.apply(lambda row: row.step * (self.tsim/num_Tstep), axis = 1)
-
-            if self.tstep == 'fs':
-                #each step is sub multiple of time for simulation i.e tsim.
-                df_file1['time_step(fs)'] = df_file1.apply(lambda row: row.step *1000*(self.tsim/num_Tstep), axis = 1)
-                
-            df_file1.to_csv('output/' + self.out_filename + '.csv', sep=',', header=True, index=False)   
+            
+        elif ls_unit.index(self.tstep) == ls_unit.index(self.tsim_unit):
+            multiplier = 1
+            
+        else:
+            reverse_ls_unit = ls_unit[::-1]
+            multiplier = 10 **(3 * reverse_ls_unit.index(self.tstep))
+            
+        self.conv_units(multiplier, df_file1)
+        
+    def conv_units(self, multiplier, df_file1): 
+        df_file1['time_step' + '(' + self.tstep + ')'] = df_file1.apply(lambda row:row.step * multiplier *self.tsim, axis = 1)
+        df_file1.to_csv('./output/' + self.out_filename + '.csv', sep=',', header=True, index=False)
         self.plot(df_file1)
-    
-    def plot(self,df_file1):
+
+        #print(df_file1.head(10))
+        
+    #plot the required graph
+    def plot(self, df_file1):
         x = df_file1['time_step' + '(' + self.tstep + ')']
         y = df_file1['Param_val']
 
@@ -72,26 +87,59 @@ class read_file_and_plot:
         ax.plot(x, y, color='black', linewidth=1, linestyle='-',label='test') 
         ax.set_xlim(xmin=0)
 
-        ax.set_xlabel('time step' + '(' + self.tstep + ')') # Add an x-label to the axes.
-        #derive y_label
-        y_label= (self.file_path.rsplit('/')[-1]).rsplit('.')[0]        
-        ax.set_ylabel( y_label)  # Add a y-label to the axes.
-        
-        ax.set_title('add_title')  # Add a title to the axes.
+        x_label = 'time step' + '(' + self.tstep + ')'#derive x_label 
+        ax.set_xlabel(x_label) # Add an x-label to the axes.
+        y_label= (self.file_path.rsplit('/')[-1]).rsplit('.')[0] #derive y_label    
+        ax.set_ylabel(y_label)  # Add a y-label to the axes.
+
+        ax.set_title(y_label + ' PLOT')  # Add a title to the axes.
         ax.legend(loc='best')
-        
+
         fig.savefig('output/' + self.out_filename +'.png')
-        plt.show()
+        #plt.show()
         
- 
-    
+        ##################################################
+        max_col = df_file1.shape[1]
+        # Create a Pandas Excel writer using XlsxWriter
+        excel_file = self.out_filename + '.xlsx'
+        sheet_name = self.out_filename
+        data = df_file1
+        writer = pd.ExcelWriter('./output/' + excel_file, engine='xlsxwriter')
+        data.to_excel(writer, sheet_name=sheet_name)
+        # Access the XlsxWriter workbook and worksheet objects from the dataframe.
+        workbook = writer.book
+        worksheet = writer.sheets[sheet_name]
+        
+        # Create a scatter chart object.
+        chart = workbook.add_chart({'type': 'line'})
+        
+        # Set name on axis
+        chart.set_x_axis({'name': x_label })
+        chart.set_y_axis({'name': y_label })
+        
+        max_row = len(data)
+        # [sheetname, first_row, first_col, last_row, last_col]
+        chart.add_series({
+        'name':       [sheet_name, 0, 2],
+        'categories': [sheet_name, 1, max_col, max_row, max_col],
+        'values':     [sheet_name, 1, 2, max_row, 2],
+        })
+        # Insert the chart into the worksheet in field D2
+        worksheet.insert_chart('H2', chart)
+
+        writer.save()
+        
+        plt.show()
+
 
 #this is the last step of code
 args = sys.argv
 test1 = read_file_and_plot(float(args[1]),args[2],args[3],args[4],args[5])
-# test1 = read_file_and_plot(4, 'ps', 'ps', './dist-end-to-end.agr', 'example1')
-
 test1.output()
+
+# test1 = read_file_and_plot(4, 'fs', 'ps', './dist-end-to-end.agr', 'example1')
+
+#to test this module from command line: python read_file_and_plot.py 4 'fs' 'ps' './data1/dist-end-to-end.agr' 'test_example1'
 
 
 ##### END ######
